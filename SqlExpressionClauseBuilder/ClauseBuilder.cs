@@ -10,7 +10,7 @@ namespace SqlExpressionClauseBuilder
     public class ClauseBuilder
     {
         public TableMetadata BaseTable { get; set; }
-        public List<TableMetadata> Tables { get; set; }
+        public Tables Tables { get; set; }
         public List<InnerJoinMetadata> InnerJoinItems { get; set; }
 
         public bool SelectAllColumns { get; set; }
@@ -19,7 +19,7 @@ namespace SqlExpressionClauseBuilder
 
         private ClauseBuilder(TableMetadata tableMetadata)
         {
-            this.Tables = new List<TableMetadata>();
+            this.Tables = new Tables();
             this.InnerJoinItems = new List<InnerJoinMetadata>();
             this.SelectColumNames = new List<string>();
 
@@ -42,8 +42,8 @@ namespace SqlExpressionClauseBuilder
             Expression<Func<TOuterDto, TProperty>> outerKeySelector,
             string outerTableNameOverride)
         {
-            var innerTableMetadata = this.TryGetExistingMetadata<TInnerDto>();
-            if(innerTableMetadata is null)
+            var innerTableMetadata = this.Tables.TryGetExistingMetadata<TInnerDto>();
+            if (innerTableMetadata is null)
             {
                 throw new InvalidOperationException("No existing table for specified TDto");
             }
@@ -61,21 +61,6 @@ namespace SqlExpressionClauseBuilder
             return this;
         }
 
-        private TableMetadata TryGetExistingMetadata<TDto>()
-        {
-            var type = typeof(TDto);
-
-            return this.TryGetExistingMetadata(type);
-        }
-
-        private TableMetadata TryGetExistingMetadata(Type type)
-        {
-            var metadata = this.Tables.SingleOrDefault(tm => tm.Type == type);
-
-            return metadata;
-        }
-
-
         public ClauseBuilder SelectAll()
         {
             this.SelectAllColumns = true;
@@ -85,12 +70,11 @@ namespace SqlExpressionClauseBuilder
 
         public ClauseBuilder Select<TDto>(params Expression<Func<TDto, object>>[] selectors)
         {
-            var tableType = typeof(TDto);
-            var tableMetadata = this.Tables.Single(tm => tm.Type == tableType);
+            var tableMetadata = this.Tables.GetExistingMetadata<TDto>();
 
             var columnNames = new List<string>();
 
-            foreach(var selector in selectors)
+            foreach (var selector in selectors)
             {
                 var propertyInfo = selector.Body.GetPropertyInfo();
                 var columnName = tableMetadata.GetFullColumnName(propertyInfo.Name);
@@ -105,8 +89,7 @@ namespace SqlExpressionClauseBuilder
 
         public ClauseBuilder Select<TDto>(Expression<Func<TDto, object[]>> columnNamesSelector)
         {
-            var tableType = typeof(TDto);
-            var tableMetadata = this.Tables.Single(tm => tm.Type == tableType);
+            var tableMetadata = this.Tables.GetExistingMetadata<TDto>();
 
             var columnNames = new List<string>();
 
@@ -129,12 +112,12 @@ namespace SqlExpressionClauseBuilder
         {
             var stringBuilder = new StringBuilder();
 
-            if(this.SelectAllColumns == true && this.SelectColumNames.Any())
+            if (this.SelectAllColumns == true && this.SelectColumNames.Any())
             {
                 throw new InvalidOperationException("Select All columns property specified as true but specific columns also appeared not empty");
             }
 
-            if(this.SelectAllColumns == false && !this.SelectColumNames.Any())
+            if (this.SelectAllColumns == false && !this.SelectColumNames.Any())
             {
                 throw new InvalidOperationException("No columns specified to select from query");
             }
@@ -187,5 +170,6 @@ namespace SqlExpressionClauseBuilder
 
             return new ClauseBuilder(tableMetadata);
         }
+
     }
 }
