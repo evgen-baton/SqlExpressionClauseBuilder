@@ -13,7 +13,13 @@ namespace Tests
                 .InnerJoin<Users, UsersMetadata, int>(u => u.Id, um => um.UserId)
                 .Select<Users>(u => new object[] { u.Email, })
                 .Select<UsersMetadata>(um => new object[] { um.UserId })
-                .Compile();
+                .Build();
+                
+            var otherSql = ClauseBuilder
+                .From<Users>()
+                .Select<Users>(u => u.Id, u => u.Email)
+                .Build();
+
         }
     }
 
