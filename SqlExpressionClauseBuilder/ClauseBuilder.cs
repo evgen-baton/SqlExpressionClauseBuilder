@@ -94,9 +94,9 @@ namespace SqlExpressionClauseBuilder
             foreach(var selector in selectors)
             {
                 var propertyInfo = selector.Body.GetPropertyInfo();
-                var columnName = propertyInfo.Name;
+                var columnName = tableMetadata.GetFullColumnName(propertyInfo.Name);
 
-                columnNames.Add($"{tableMetadata.TableName}.{columnName}");
+                columnNames.Add(columnName);
             }
 
             this.SelectColumNames.AddRange(columnNames);
@@ -116,9 +116,9 @@ namespace SqlExpressionClauseBuilder
             foreach (var expression in columnExpressions)
             {
                 var propertyInfo = expression.GetPropertyInfo();
-                var columnName = propertyInfo.Name;
+                var columnName = tableMetadata.GetFullColumnName(propertyInfo.Name);
 
-                columnNames.Add($"{tableMetadata.TableName}.{columnName}");
+                columnNames.Add(columnName);
             }
 
             this.SelectColumNames.AddRange(columnNames);

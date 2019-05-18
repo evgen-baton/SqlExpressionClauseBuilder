@@ -12,5 +12,10 @@ namespace SqlExpressionClauseBuilder
             this.TableType = tableType;
             this.TableName = tableName;
         }
+
+        public string GetFullColumnName(string columnName)
+        {
+            return $"{this.TableName}.{columnName}";
+        }
     }
 }
