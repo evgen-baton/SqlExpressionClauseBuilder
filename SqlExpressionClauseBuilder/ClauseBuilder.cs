@@ -39,43 +39,42 @@ namespace SqlExpressionClauseBuilder
 
         public ClauseBuilder InnerJoin<TInnerDto, TOuterDto, TProperty>(
             Expression<Func<TInnerDto, TProperty>> innerKeySelector,
-            Expression<Func<TOuterDto, TProperty>> outerKeySelector, string outerTableNameOverride)
+            Expression<Func<TOuterDto, TProperty>> outerKeySelector,
+            string outerTableNameOverride)
         {
-            var innerTableType = typeof(TInnerDto);
-            var innerTableName = innerTableType.Name;
+            var innerTableMetadata = this.TryGetExistingMetadata<TInnerDto>();
+            if(innerTableMetadata is null)
+            {
+                throw new InvalidOperationException("No existing table for specified TDto");
+            }
 
             var outerTableType = typeof(TOuterDto);
             var outerTableName = outerTableNameOverride;
 
-            if (!this.Tables.Select(tm => tm.TableType).Contains(innerTableType) &&
-                !this.Tables.Select(tm => tm.TableType).Contains(outerTableType))
-            {
-                throw new InvalidOperationException($"No tables found for both {innerTableType.Name} and {outerTableType.Name}");
-            }
+            var outerTableMetadata = new TableMetadata(outerTableType, outerTableName);
 
-            if (!this.Tables.Select(tm => tm.TableType).Contains(innerTableType))
-            {
-                var tableMetadata = new TableMetadata(innerTableType, innerTableName);
-                this.Tables.Add(tableMetadata);
-            }
+            this.Tables.Add(outerTableMetadata);
 
-            if (!this.Tables.Select(tm => tm.TableType).Contains(outerTableType))
-            {
-                var tableMetadata = new TableMetadata(outerTableType, outerTableName);
-                this.Tables.Add(tableMetadata);
-            }
-
-            var innerTableMetadata = this.Tables.Single(tm => tm.TableType == innerTableType);
-            var outerTableMetadata = this.Tables.Single(tm => tm.TableType == outerTableType);
-
-            var innerColumnName = innerKeySelector.GetPropertyInfo().Name;
-            var outerColumnName = outerKeySelector.GetPropertyInfo().Name;
-
-            var innerJoinMetadata = new InnerJoinMetadata(innerTableMetadata.TableName, outerTableMetadata.TableName, innerColumnName, outerColumnName);
+            var innerJoinMetadata = new InnerJoinMetadata(innerTableMetadata, outerTableMetadata, innerKeySelector.Body, outerKeySelector.Body);
             this.InnerJoinItems.Add(innerJoinMetadata);
 
             return this;
         }
+
+        private TableMetadata TryGetExistingMetadata<TDto>()
+        {
+            var type = typeof(TDto);
+
+            return this.TryGetExistingMetadata(type);
+        }
+
+        private TableMetadata TryGetExistingMetadata(Type type)
+        {
+            var metadata = this.Tables.SingleOrDefault(tm => tm.Type == type);
+
+            return metadata;
+        }
+
 
         public ClauseBuilder SelectAll()
         {
@@ -87,7 +86,7 @@ namespace SqlExpressionClauseBuilder
         public ClauseBuilder Select<TDto>(params Expression<Func<TDto, object>>[] selectors)
         {
             var tableType = typeof(TDto);
-            var tableMetadata = this.Tables.Single(tm => tm.TableType == tableType);
+            var tableMetadata = this.Tables.Single(tm => tm.Type == tableType);
 
             var columnNames = new List<string>();
 
@@ -107,7 +106,7 @@ namespace SqlExpressionClauseBuilder
         public ClauseBuilder Select<TDto>(Expression<Func<TDto, object[]>> columnNamesSelector)
         {
             var tableType = typeof(TDto);
-            var tableMetadata = this.Tables.Single(tm => tm.TableType == tableType);
+            var tableMetadata = this.Tables.Single(tm => tm.Type == tableType);
 
             var columnNames = new List<string>();
 
@@ -150,13 +149,21 @@ namespace SqlExpressionClauseBuilder
                 stringBuilder.AppendLine($"SELECT {selectColumnsString}");
             }
 
-            stringBuilder.AppendLine($"FROM {this.BaseTable.TableName}");
+            stringBuilder.AppendLine($"FROM {this.BaseTable.Name}");
 
             if (this.InnerJoinItems.Any())
             {
                 foreach (var metadata in this.InnerJoinItems)
                 {
-                    stringBuilder.AppendLine($"INNER JOIN {metadata.OuterTableName} ON {metadata.InnerTableName}.{metadata.InnerColumnName} = {metadata.OuterTableName}.{metadata.OuterColumnName}");
+                    var outerTableName = metadata.OuterTable.Name;
+
+                    var innerColumnPropertyName = metadata.InnerKeySelector.GetPropertyInfo().Name;
+                    var innerColumnName = metadata.InnerTable.GetFullColumnName(innerColumnPropertyName);
+
+                    var outerColumnPropertyName = metadata.OuterKeySelector.GetPropertyInfo().Name;
+                    var outerColumnName = metadata.OuterTable.GetFullColumnName(outerColumnPropertyName);
+
+                    stringBuilder.AppendLine($"INNER JOIN {outerTableName} ON {innerColumnName} = {outerColumnName}");
                 }
             }
 
