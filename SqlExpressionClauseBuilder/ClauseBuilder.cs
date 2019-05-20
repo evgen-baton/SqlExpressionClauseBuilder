@@ -16,12 +16,15 @@ namespace SqlExpressionClauseBuilder
         public bool SelectAllColumns { get; set; }
         public List<string> SelectColumNames { get; set; }
 
+        public List<string> WhereStrings { get; set; }
+
 
         private ClauseBuilder(TableMetadata tableMetadata)
         {
             this.Tables = new Tables();
             this.InnerJoinItems = new List<InnerJoinMetadata>();
             this.SelectColumNames = new List<string>();
+            this.WhereStrings = new List<string>();
 
             this.BaseTable = tableMetadata;
             this.Tables.Add(tableMetadata);
@@ -108,6 +111,47 @@ namespace SqlExpressionClauseBuilder
             return this;
         }
 
+        public ClauseBuilder Where<TDto>(Expression<Func<TDto, bool>> expression)
+        {
+            var table = this.Tables.GetExistingMetadata<TDto>();
+
+            var binaryExpression = expression.Body as BinaryExpression;
+            var left = binaryExpression.Left; // PropertyExpression always
+            var right = binaryExpression.Right; // PropertyExpression or ConstantExpression
+            var nodeType = binaryExpression.NodeType;
+
+            var leftMemberExpression = left as MemberExpression;
+            var leftPropertyInfo = leftMemberExpression.GetPropertyInfo();
+            var columnName = table.GetFullColumnName(leftPropertyInfo.Name);
+
+            string rightValue = string.Empty;
+
+            var rightConstantExpression = right as ConstantExpression;
+            if(rightConstantExpression != null)
+            {
+                var rightConstantValue = rightConstantExpression.Value;
+                rightValue = rightConstantValue.ToString();
+            }
+
+            var rightMemberExpression = right as MemberExpression;
+            if(rightMemberExpression != null)
+            {
+                var rightPropertyInfo = rightMemberExpression.GetMemberInfo();
+                rightValue = $"@{rightPropertyInfo.Name}";
+            }        
+
+            string operation = string.Empty;
+
+            if(nodeType == ExpressionType.Equal)
+            {
+                operation = "=";
+            }
+
+            this.WhereStrings.Add($"{columnName} {operation} {rightValue}");
+
+            return this;
+        }
+
         public string Build()
         {
             var stringBuilder = new StringBuilder();
@@ -147,6 +191,19 @@ namespace SqlExpressionClauseBuilder
                     var outerColumnName = metadata.OuterTable.GetFullColumnName(outerColumnPropertyName);
 
                     stringBuilder.AppendLine($"INNER JOIN {outerTableName} ON {innerColumnName} = {outerColumnName}");
+                }
+            }
+
+            if (WhereStrings.Any())
+            {
+                var firstCondition = this.WhereStrings[0];
+                stringBuilder.AppendLine($"WHERE {firstCondition}");
+
+                for(int index = 1; index < this.WhereStrings.Count; index++)
+                {
+                    var condition = this.WhereStrings[index];
+
+                    stringBuilder.AppendLine($"AND {condition}");
                 }
             }
 

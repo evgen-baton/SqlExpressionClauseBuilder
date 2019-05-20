@@ -53,10 +53,49 @@ namespace SqlExpressionClauseBuilder.Extensions
         {
             PropertyInfo propInfo = memberExpression.Member as PropertyInfo;
             if (propInfo == null)
-                throw new ArgumentException(string.Format(
-                    "Expression refers to a field, not a property."));
+            {
+                throw new ArgumentException("Expression is not PropertyInfo");
+            }
 
             return propInfo;
         }
+
+        public static FieldInfo GetFieldInfo(this Expression expression)
+        {
+            var unaryExpression = expression as UnaryExpression;
+            if (!(unaryExpression is null))
+            {
+                return GetFieldInfo(unaryExpression.Operand as MemberExpression);
+            }
+
+            var memberExpression = expression as MemberExpression;
+            if (!(memberExpression is null))
+            {
+                return GetFieldInfo(memberExpression);
+            }
+
+            throw new InvalidOperationException("Could not get FieldInfo from specified expression");
+        }
+
+        private static FieldInfo GetFieldInfo(this MemberExpression memberExpression)
+        {
+            var fieldInfo = memberExpression.Member as FieldInfo;
+            if (fieldInfo == null)
+            {
+                throw new ArgumentException("Expression is not FieldInfo");
+            }
+
+            return fieldInfo;
+        }
+
+        public static MemberInfo GetMemberInfo(this MemberExpression memberExpression)
+        {
+            var memberInfo = memberExpression.Member as MemberInfo;
+            if (memberInfo is null)
+                throw new ArgumentException("Expression is not MemberInfo");
+
+            return memberInfo;
+        }
+
     }
 }
