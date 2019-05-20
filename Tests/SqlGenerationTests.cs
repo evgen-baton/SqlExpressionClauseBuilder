@@ -36,6 +36,58 @@ namespace Tests
 
             Assert.Equal(expected, sql);
         }
+
+        [Fact]
+        public void WhereTest1()
+        {
+            var sql = ClauseBuilder
+                .From<Users>()
+                .Where<Users>(u => u.Id == 5)
+                .Select<Users>(u => u.Id)
+                .Build();
+
+            const string expected = "SELECT Users.Id\r\n" +
+                                    "FROM Users\r\n" +
+                                    "WHERE Users.Id = 5\r\n";
+
+            Assert.Equal(expected, sql);
+        }
+
+        [Fact]
+        public void WhereTest2()
+        {
+            int someValue = 12;
+
+            var sql = ClauseBuilder
+                .From<Users>()
+                .Where<Users>(u => u.Id == someValue)
+                .Select<Users>(u => u.Id)
+                .Build();
+
+            const string expected = "SELECT Users.Id\r\n" +
+                                    "FROM Users\r\n" +
+                                    "WHERE Users.Id = @someValue\r\n";
+
+            Assert.Equal(expected, sql);
+        }
+
+        [Fact]
+        public void WhereTest3()
+        {
+            string email = "test@email.ru";
+
+            var sql = ClauseBuilder
+                .From<Users>()
+                .Where<Users>(u => u.Email == email)
+                .Select<Users>(u => u.Id)
+                .Build();
+
+            const string expected = "SELECT Users.Id\r\n" +
+                                    "FROM Users\r\n" +
+                                    "WHERE Users.Email = @email\r\n";
+
+            Assert.Equal(expected, sql);
+        }
     }
 
     public class Users
